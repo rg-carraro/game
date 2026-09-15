@@ -10,3 +10,20 @@ description: Corrigir ou testar movimento em primeira pessoa e projeção do par
 - Valide W/S, A/D e ambas as setas de rotação com os aliases reais do microStudio presentes. A/D não deve alterar angle.
 - Use node tests/controls.cjs para regressão. Verifique frente e trás em quatro orientações e que avançar aumenta o tamanho aparente de um objeto à frente.
 - Ao trabalhar na física, avalie o alcance dos saltos frente aos vãos e diferenças de altura. Não considere uma correção de controles como prova de que o percurso inteiro é jogável.
+
+## Saltos e colisões
+
+- Os parâmetros atuais são `jumpSpeed = 0.55`, `gravity = -0.015` e `speed = 0.15` por update. São escolhas ajustáveis, não exigências do runtime.
+- O usuário preferiu reduzir o pulo de 0.65 para 0.55. Considere facilidade de controle e altura aparente, além do alcance horizontal.
+- A posição inicial dos olhos é 2.1: topo da plataforma (0.5) mais 1.6. Começar abaixo dessa altura fazia a colisão cancelar o salto no primeiro frame.
+- Simule a física real entre plataformas consecutivas, considerando deslocamento lateral, subida e pouso. O pulo atual foi simulado saindo 1.5 unidade à frente do centro, na direção do destino, e soltando avanço sobre ele.
+- Pendências conhecidas: a colisão vertical usa uma faixa de altura sem verificar cruzamento do topo na descida; chave e saída verificam apenas distância horizontal. Não apresente isso como corrigido sem alterar e validar a lógica.
+
+## Plataformas em perspectiva
+
+- Use `w`, `h` e `d` para construir os oito vértices do bloco, correspondendo ao volume das colisões.
+- `cameraPoint()` fornece coordenadas da câmera; `project()` projeta pontos. `drawPlatforms()` seleciona faces voltadas ao jogador e ordena da mais distante para a mais próxima.
+- Recorte faces contra o plano próximo (`z = 0.1`) com `clipPlatformFace()` antes de dividir pela profundidade. Descartar o bloco pelo centro faz a plataforma sob o jogador desaparecer; projetar vértices atrás da câmera sem recorte distorce o desenho.
+- O topo claro e as laterais sombreadas indicam profundidade. `screen.fillPolygon(points, color)` recebe pares x/y.
+- Verifique bloco visto de cima e de lado, redução aparente da borda distante, faces cruzando o plano próximo e blocos atrás da câmera. Os testes existentes cobrem esses casos e quatro orientações.
+- A ordenação pela profundidade média é aproximada; personagens e objetivos são desenhados depois das plataformas. Isso não é oclusão 3D completa.
