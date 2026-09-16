@@ -2,7 +2,7 @@
 let player = { x: 0, y: 2.1, z: 15, vy: 0, isGrounded: true, angle: 0 };
 let seek = { x: 0, y: 1.5, z: 28 };
 let key = { x: 0, y: 6.4, z: -68, collected: false };
-let door = { x: 0, y: 7, z: -70, open: false };
+let door = { x: 0, y: 7, z: -71, open: false };
 
 let gameOver = false;
 let gameWon = false;
@@ -45,6 +45,27 @@ const lobbyMap = [
 const lobbyGate = {x:0,z:-7};
 let platforms = parkourMap;
 let routeStep = 0;
+let eyeHeight = 1.6;
+let crouching = false;
+const playerRadius = 0.22;
+const parkourObstacles = [
+  {x:-4.5,y:2.5,z:-9,w:1.2,h:1,d:3,color:"#bd804f"},
+  {x:7.5,y:4.1,z:-31,w:1.4,h:1.2,d:3,color:"#bd804f"},
+  {x:-7.5,y:5.6,z:-53,w:1.4,h:1.2,d:3,color:"#bd804f"},
+  // Teto baixo: 1.15 de vão sobre o piso da última plataforma.
+  {x:0,y:7.15,z:-69,w:8,h:1,d:1.1,color:"#d7b463"}
+];
+const lobbyObstacles = [
+  {x:6,y:2.15,z:0,w:4,h:1,d:2,color:"#d7b463"}
+];
+function activeObstacles() { return platforms === lobbyMap ? lobbyObstacles : parkourObstacles; }
+function overlapsXZ(box,x,z) {
+  return Math.abs(x-box.x)<box.w/2+playerRadius && Math.abs(z-box.z)<box.d/2+playerRadius;
+}
+function bodyBlocked(x,z,feet,height) {
+  return platforms.concat(activeObstacles()).some(b => overlapsXZ(b,x,z) &&
+    feet < b.y+b.h/2-0.001 && feet+height > b.y-b.h/2+0.001);
+}
 
 function enterLobby() {
   resetGame();
@@ -54,12 +75,14 @@ function enterLobby() {
 }
 
 function resetGame() {
+  eyeHeight = 1.6;
+  crouching = false;
   platforms = parkourMap;
   routeStep = 0;
   player = { x: 0, y: 2.1, z: 15, vy: 0, isGrounded: true, angle: 0 };
   seek = { x: 0, y: 1.5, z: 28 };
   key = { x: 0, y: 6.4, z: -68, collected: false };
-  door = { x: 0, y: 7, z: -70, open: false };
+  door = { x: 0, y: 7, z: -71, open: false };
   gameOver = false;
   gameWon = false;
   startTimer = 0;
@@ -166,6 +189,12 @@ update = function() {
 };
 
 function movePlayer() {
+  const feet = player.y-eyeHeight;
+  crouching = !!keyboard.KEY_Q || (crouching && bodyBlocked(player.x,player.z,feet,1.8));
+  eyeHeight = crouching ? 0.8 : 1.6;
+  player.y = feet+eyeHeight;
+  const bodyHeight = crouching ? 1 : 1.8;
+  const moveSpeed = crouching ? speed*.55 : speed;
   // Setas físicas: LEFT/RIGHT também incluem A/D no microStudio.
   if (keyboard.ARROW_LEFT) player.angle -= 0.06;
   if (keyboard.ARROW_RIGHT) player.angle += 0.06;
@@ -180,38 +209,52 @@ function movePlayer() {
     strafe /= length;
     const sinA = Math.sin(player.angle);
     const cosA = Math.cos(player.angle);
-    player.x += (forward * sinA + strafe * cosA) * speed;
-    player.z += (-forward * cosA + strafe * sinA) * speed;
+    const nextX = player.x+(forward*sinA+strafe*cosA)*moveSpeed;
+    if (!bodyBlocked(nextX,player.z,feet,bodyHeight)) player.x=nextX;
+    const nextZ = player.z+(-forward*cosA+strafe*sinA)*moveSpeed;
+    if (!bodyBlocked(player.x,nextZ,feet,bodyHeight)) player.z=nextZ;
   }
 
   // Pulo
-  if (keyboard.SPACE && player.isGrounded) {
+  if (keyboard.SPACE && player.isGrounded && !crouching) {
     player.vy = jumpSpeed;
     player.isGrounded = false;
   }
 
   // Gravidade
-  const previousFeet = player.y - 1.6;
+  const previousFeet = player.y - eyeHeight;
   player.vy += gravity;
   player.y += player.vy;
 
   // Colisão com Plataformas
   player.isGrounded = false;
-  platforms.forEach(p => {
-    let halfW = p.w / 2;
-    let halfD = p.d / 2;
+  let landingTop = -Infinity;
+  platforms.concat(activeObstacles()).forEach(p => {
     let topY = p.y + p.h / 2;
 
     if (
-      player.x >= p.x - halfW && player.x <= p.x + halfW &&
-      player.z >= p.z - halfD && player.z <= p.z + halfD &&
-      player.vy <= 0 && previousFeet >= topY - 0.001 && player.y - 1.6 <= topY
+      overlapsXZ(p,player.x,player.z) &&
+      player.vy <= 0 && previousFeet >= topY - 0.001 && player.y - eyeHeight <= topY
     ) {
-      player.y = topY + 1.6;
-      player.vy = 0;
-      player.isGrounded = true;
+      landingTop = Math.max(landingTop,topY);
     }
   });
+  // Mesmo raio nas laterais e no apoio; prioriza o topo mais alto na descida.
+  if (landingTop !== -Infinity) {
+    player.y = landingTop + eyeHeight;
+    player.vy = 0;
+    player.isGrounded = true;
+  }
+  if(player.vy>0) {
+    platforms.concat(activeObstacles()).forEach(b => {
+      const bottom=b.y-b.h/2;
+      if(overlapsXZ(b,player.x,player.z) && previousFeet+bodyHeight<=bottom &&
+        player.y-eyeHeight+bodyHeight>=bottom) {
+        player.y=bottom-bodyHeight+eyeHeight;
+        player.vy=0;
+      }
+    });
+  }
 }
 
 function updateGame() {
@@ -219,7 +262,7 @@ function updateGame() {
   startTimer += 1;
   movePlayer();
   platforms.forEach((p,i) => {
-    if (player.isGrounded && Math.abs(player.y-(p.y+p.h/2+1.6))<0.01 &&
+    if (player.isGrounded && Math.abs(player.y-(p.y+p.h/2+eyeHeight))<0.01 &&
       Math.abs(player.x-p.x)<=p.w/2 && Math.abs(player.z-p.z)<=p.d/2) routeStep=Math.max(routeStep,i);
   });
 
@@ -260,7 +303,7 @@ function updateGame() {
   if (door.open) {
     let ddx = player.x - door.x;
     let ddz = player.z - door.z;
-    if (Math.hypot(ddx, ddz) < 1.8 && Math.abs(player.y-door.y)<2 && player.isGrounded) {
+    if (Math.hypot(ddx, ddz) < 0.8 && Math.abs(player.y-door.y)<2 && player.isGrounded) {
       gameWon = true;
       changeScene("victory");
       sound("sine", "C4 E4 G4 C5", 160, 0.3);
@@ -319,9 +362,9 @@ function clipPlatformFace(vertices) {
   return result;
 }
 
-function drawPlatforms() {
+function drawPlatforms(blocks = platforms) {
   const faces = [];
-  platforms.forEach(p => {
+  blocks.forEach(p => {
     const left = p.x - p.w / 2, right = p.x + p.w / 2;
     const bottom = p.y - p.h / 2, top = p.y + p.h / 2;
     const back = p.z - p.d / 2, front = p.z + p.d / 2;
@@ -333,11 +376,11 @@ function drawPlatforms() {
     ].map(v => cameraPoint(v[0], v[1], v[2]));
     const sides = [
       { indices: [4, 5, 6, 7], visible: player.y > top, color: p.color || "#879eae" },
-      { indices: [0, 3, 2, 1], visible: player.y < bottom, color: "#252c34" },
-      { indices: [3, 7, 6, 2], visible: player.z > front, color: "#485b6b" },
-      { indices: [0, 1, 5, 4], visible: player.z < back, color: "#3b4c5a" },
-      { indices: [0, 4, 7, 3], visible: player.x < left, color: "#344451" },
-      { indices: [1, 2, 6, 5], visible: player.x > right, color: "#596f80" }
+      { indices: [0, 3, 2, 1], visible: player.y < bottom, color: p.sideColor || "#252c34" },
+      { indices: [3, 7, 6, 2], visible: player.z > front, color: p.frontColor || p.sideColor || "#485b6b" },
+      { indices: [0, 1, 5, 4], visible: player.z < back, color: p.sideColor || "#3b4c5a" },
+      { indices: [0, 4, 7, 3], visible: player.x < left, color: p.sideColor || "#344451" },
+      { indices: [1, 2, 6, 5], visible: player.x > right, color: p.sideColor || "#596f80" }
     ];
     sides.forEach(side => {
       if (!side.visible) return;
@@ -510,23 +553,94 @@ function drawRouteMap() {
   screen.drawText("VOCÊ: BRANCO",x,-31,5,"#ffffff");
 }
 
+function doorBlocks(x,floor,z,open) {
+  const blocks=[];
+  const box=(x,y,z,w,h,d,color,side)=>blocks.push({x,y,z,w,h,d,color,frontColor:color,sideColor:side});
+  for(const side of [-1,1]) box(x+side*1.45,floor+1.8,z,.28,3.6,.65,"#ba9764","#5f4132");
+  box(x,floor+3.65,z,3.2,.3,.7,"#d2b17a","#6d4c35");
+  box(x,floor+.06,z,3.2,.12,.9,"#ac8c59","#614329");
+  if(open) {
+    box(x-1.22,floor+1.72,z+1.25,.22,3.3,2.5,"#754534","#543022");
+  } else {
+    box(x,floor+1.72,z,2.6,3.3,.22,"#764735","#40291f");
+    box(x,floor+2.35,z+.15,2.05,1.35,.13,"#965e42","#5c382c");
+    box(x,floor+.83,z+.15,2.05,1.05,.13,"#925b40","#5c382c");
+    box(x+.92,floor+1.55,z+.27,.14,.34,.14,"#f7d47b","#a97a32");
+  }
+  return blocks;
+}
+
+function worldPolygon(vertices,color) {
+  const points=clipPlatformFace(vertices.map(v=>cameraPoint(v[0],v[1],v[2])));
+  if(points.length<3) return;
+  const projected=[];
+  points.forEach(v=>projected.push(v.x*160/v.z,v.y*160/v.z));
+  screen.fillPolygon(projected,color);
+}
+
+function drawGuidingLight() {
+  const target=parkourMap[Math.min(routeStep+1,parkourMap.length-1)];
+  const x=routeStep===parkourMap.length-1 ? (key.collected ? door.x : key.x) : target.x;
+  const z=routeStep===parkourMap.length-1 ? (key.collected ? door.z : key.z) : target.z;
+  const y=target.y+target.h/2+.04;
+  // Seta luminosa sobre a plataforma, acompanhando a perspectiva.
+  worldPolygon([[x-.65,y,z+.6],[x-.22,y,z+.6],[x-.22,y,z-.1],
+    [x-.55,y,z-.1],[x,y,z-.8],[x+.55,y,z-.1],[x+.22,y,z-.1],
+    [x+.22,y,z+.6],[x+.65,y,z+.6]],"#80eaff");
+  for(let i=0;i<5;i++) {
+    const phase=startTimer*.035+i*1.25;
+    const p=project(x+Math.sin(phase)*.55,y+.6+i*.22+Math.sin(phase)*.12,z+Math.cos(phase)*.35);
+    if(p.visible) {
+      const size=Math.min(8,p.size*.1);
+      screen.fillRect(p.x,p.y,size*2,size*2,"#254859");
+      screen.fillRect(p.x,p.y,size,size,"#a6f3ff");
+    }
+  }
+}
+
+function hotelScenery() {
+  const blocks=[];
+  for(let i=0;i<12;i++) {
+    const p=parkourMap[i];
+    for(const side of [-1,1]) {
+      blocks.push({x:side*14,y:p.y+4,z:p.z,w:.65,h:9,d:8,color:"#50303a",sideColor:"#291f2b"});
+      blocks.push({x:side*13.4,y:p.y+2,z:p.z,w:.5,h:4,d:.6,color:"#937048",sideColor:"#674533"});
+      blocks.push({x:side*13,y:p.y+4.4,z:p.z,w:.35,h:.65,d:.45,color:"#ffe0a0",sideColor:"#bc8750"});
+    }
+  }
+  return blocks;
+}
+
+function drawKeySprite() {
+  const p=project(key.x,key.y+Math.sin(startTimer*.06)*.12,key.z);
+  if(!p.visible) return;
+  const scale=p.size*.6;
+  const shape=(vertices,color)=>{
+    const points=[];
+    for(let i=0;i<vertices.length;i+=2) points.push(p.x+vertices[i]*scale,p.y+vertices[i+1]*scale);
+    screen.fillPolygon(points,color);
+  };
+  shape([-.48,.12,-.48,.52,-.22,.72,.14,.72,.38,.5,.38,.16,.12,-.08,-.2,-.08],"#b87a28");
+  shape([-.42,.18,-.42,.5,-.2,.65,.12,.65,.3,.47,.3,.2,.08,0,-.17,0],"#ffe394");
+  shape([-.25,.25,-.25,.43,-.12,.51,.06,.51,.15,.4,.15,.26,.02,.16,-.12,.16],"#695037");
+  shape([-.13,.04,.08,.04,.08,-.82,.38,-.82,.38,-.62,.2,-.62,.2,-.48,.4,-.48,.4,-.28,.08,-.28,.08,-.94,-.13,-.94],"#e8b951");
+  screen.fillRect(p.x-.08*scale,p.y-.43*scale,.05*scale,.9*scale,"#fff0b6");
+}
+
 function drawLobby() {
   screen.fillRect(0,0,screen.width || 400,screen.height || 200,"#101d27");
-  drawPlatforms();
+  drawPlatforms(platforms.concat(activeObstacles(),doorBlocks(lobbyGate.x,.5,lobbyGate.z,false)));
   const gate = project(lobbyGate.x,2.6,lobbyGate.z);
   if (gate.visible) {
-    screen.fillRect(gate.x,gate.y,3.4*gate.size,4.2*gate.size,"#243d49");
-    screen.fillRect(gate.x,gate.y,2.7*gate.size,3.6*gate.size,"#964451");
-    screen.fillRect(gate.x+.8*gate.size,gate.y-.3*gate.size,.2*gate.size,.2*gate.size,"#ffd68a");
     screen.drawText("ENTRADA",gate.x,gate.y+2.4*gate.size,Math.min(12,.4*gate.size),"#ffd68a");
   }
   screen.fillRect(0,82,194,27,"#101118");
   caption("LOBBY • ÁREA SEGURA",87,11,"#8ce7b0");
-  caption("Treine nos blocos dourados à esquerda.",75,7);
+  caption("Saltos à esquerda • Passagem baixa à direita",75,7);
   caption("WASD: mover  |  ← →: olhar  |  ESPAÇO: pular",-66,8);
-  caption("C: som  |  M: menu",-80,8);
+  caption("Q: agachar  |  C: som  |  M: menu",-80,8);
   const near = Math.hypot(player.x-lobbyGate.x,player.z-lobbyGate.z)<2.5;
-  caption(near ? "E • ABRIR A PORTA E COMEÇAR" : "Vá até a porta vermelha quando estiver pronto.",-48,9,"#ffd68a");
+  caption(near ? "E • ABRIR A PORTA E COMEÇAR" : "Vá até a porta de madeira quando estiver pronto.",-48,9,"#ffd68a");
 }
 
 function drawFrontEnd() {
@@ -574,7 +688,12 @@ draw = function() {
   screen.fillRect(0, 0, screen.width || 400, screen.height || 300, "#0b0b12");
   if (scene !== "playing") { drawFrontEnd(); return; }
 
-  drawPlatforms();
+  const floor=parkourMap[parkourMap.length-1].y+.5;
+  const woodPlatforms=platforms.map(p=>Object.assign({},p,{color:"#89654e",sideColor:"#44313a"}));
+  drawPlatforms(woodPlatforms.concat(activeObstacles(),hotelScenery(),doorBlocks(door.x,floor,door.z,door.open)));
+  drawGuidingLight();
+  const warning = project(0,8,-69);
+  if(warning.visible) screen.drawText("Q • AGACHE",warning.x,warning.y,Math.min(12,warning.size*.6),"#ffd68a");
 
   // Numeração do percurso ajuda a escolher o próximo salto.
   platforms.forEach((p,i) => {
@@ -584,16 +703,12 @@ draw = function() {
   });
 
   if (!key.collected) {
-    let k3d = project(key.x, key.y, key.z);
-    if (k3d.visible) {
-      screen.fillRect(k3d.x, k3d.y, 12 * (k3d.size / 20), 12 * (k3d.size / 20), "#ffcc00");
-    }
+    drawKeySprite();
   }
 
   let d3d = project(door.x, door.y, door.z);
   if (d3d.visible) {
-    let color = door.open ? "#00ff66" : "#ff0000";
-    screen.fillRect(d3d.x, d3d.y, 20 * (d3d.size / 20), 35 * (d3d.size / 20), color);
+    screen.drawText(door.open ? "SAÍDA ABERTA" : "0012 • PRECISA DA CHAVE",d3d.x,d3d.y+2.4*d3d.size,Math.min(10,d3d.size*.3),"#ffe0a0");
   }
 
   let s3d = project(seek.x, seek.y, seek.z);
@@ -604,9 +719,10 @@ draw = function() {
   if (startTimer <= 180) {
     screen.drawText("CORRA! O SEEK ESTÁ CHEGANDO!", 0, 70, 14, "#ff0055");
   } else if (key.collected && !gameWon) {
-    screen.drawText("Chave coletada! Corra para a porta verde!", 0, 80, 14, "#00ff66");
+    screen.drawText("Chave coletada! Siga a luz até a saída!", 0, 80, 12, "#80eaff");
   }
   drawRouteMap();
+  caption(crouching ? "AGACHADO • Levante ao sair da passagem" : "Q: agachar • Caixas: pule ou contorne",-76,7,"#a9d7ce");
   caption("PLATAFORMA " + (routeStep+1) + " / " + parkourMap.length,-88,8,"#ffdc94");
 
   if (gameOver) {

@@ -16,8 +16,11 @@ description: Corrigir ou testar movimento em primeira pessoa e projeção do par
 - Os parâmetros atuais são `jumpSpeed = 0.55`, `gravity = -0.015` e `speed = 0.15` por update. São escolhas ajustáveis, não exigências do runtime.
 - O usuário preferiu reduzir o pulo de 0.65 para 0.55. Considere facilidade de controle e altura aparente, além do alcance horizontal.
 - A posição inicial dos olhos é 2.1: topo da plataforma (0.5) mais 1.6. Começar abaixo dessa altura fazia a colisão cancelar o salto no primeiro frame.
-- Simule a física real entre plataformas consecutivas, considerando deslocamento lateral, subida e pouso. O pulo atual foi simulado saindo 1.5 unidade à frente do centro, na direção do destino, e soltando avanço sobre ele.
-- Pendências conhecidas: a colisão vertical usa uma faixa de altura sem verificar cruzamento do topo na descida; chave e saída verificam apenas distância horizontal. Não apresente isso como corrigido sem alterar e validar a lógica.
+- Simule a física real entre plataformas consecutivas, considerando deslocamento lateral, subida e pouso. O mapa atual de 12 plataformas é verificado por tests/map.cjs com saltos a partir do centro e avanço solto sobre o destino.
+- O pouso verifica cruzamento do topo na descida e escolhe o topo mais alto. Use overlapsXZ tanto no apoio quanto nas laterais: misturar centro no pouso e raio nas laterais causava travamento nas bordas.
+- Q agacha preservando os pés, reduzindo eyeHeight e velocidade; só bloqueie levantar quando já estiver agachado sob um teto. Contato lateral não deve forçar agachamento.
+- Rode node tests/obstacles.cjs e node tests/map.cjs ao mudar colisões. Cubra bordas nas quatro direções, pouso rasante, teto, caixas e passagem baixa antes da saída.
+- Chave usa distância 3D; saída exige proximidade, altura e isGrounded. Plataformas e obstáculos são sólidos; portas e paredes decorativas não participam das colisões.
 
 ## Plataformas em perspectiva
 

@@ -14,7 +14,7 @@ description: Editar e preparar o jogo JavaScript deste projeto para testes no mi
 ## Cenas, desenho e reinício
 
 - `init()` abre o menu; `startGame()` reinicia diretamente a partida. Use `startGame()` nos testes de movimento para não testar um jogador bloqueado no menu.
-- `scene` controla menu, settings, intro, playing, jumpscare, defeat e victory. Apenas playing executa `updateGame()`.
+- `scene` controla menu, lobby, settings, intro, playing, jumpscare, defeat e victory. Lobby usa movePlayer() sem perseguição; apenas playing executa `updateGame()`.
 - `changeScene()` zera o relógio da cena, cancela sons e limpa a repetição do volume. `resetGame()` reinicia jogador, Seek, chave, porta e perseguição, preservando o volume.
 - Iniciar, pular introdução e reiniciar usam `previousKeys` para detectar uma nova pressão. Segurar espaço não deve iniciar e pular a introdução na mesma ação.
 - Os tempos são contados em updates: atualmente 540 frames de introdução e 75 de jumpscare. Sincronize batidas visuais e sonoras; dispare áudio em update, não em draw.
@@ -34,3 +34,10 @@ description: Editar e preparar o jogo JavaScript deste projeto para testes no mi
 - Execute `node tests/game-flow.cjs` ao mudar cenas, introdução, áudio ou reinício. Ele cobre transições, teclas seguradas, limites, silêncio e intensidade enviada à API simulada.
 - Execute também `node tests/controls.cjs` ao mudar movimento ou desenho compartilhado. Os testes não comprovam aparência, som audível ou sincronização com o editor online.
 - Se Node não estiver no PATH, procure um executável instalado no ambiente antes de instalar dependências. Os testes usam apenas módulos nativos.
+
+## Transferência e cenário
+
+- main.js é a fonte principal; mantenha JOGO_COM_LOBBY.txt idêntico após alterações. Já houve uma aba antiga sobrescrevendo o arquivo: compare o conteúdo salvo antes de atribuir a diferença ao microStudio.
+- enterLobby() seleciona lobbyMap; resetGame() restaura parkourMap, postura e progresso. E perto da porta inicia a introdução; configurações devem retornar ao lobby sem reiniciá-lo.
+- doorBlocks() gera portas 3D; drawKeySprite() desenha a chave; drawGuidingLight() aponta para a próxima plataforma ou objetivo. hotelScenery() é decorativo. Preserve a distinção entre desenho e colisão.
+- Leia ESTADO_DO_PROJETO.md na raiz para pendências e estado da última sessão.

@@ -19,6 +19,9 @@ for(let i=1;i<run('parkourMap.length');i++) {
 run('player.angle=0');
 ctx.keyboard={KEY_W:1};
 for(let i=0;i<15;i++) run('update()');
+assert.equal(run('scene'),'playing','Teto baixo deve bloquear jogador em pé');
+ctx.keyboard={KEY_W:1,KEY_Q:1};
+for(let i=0;i<45;i++) run('update()');
 assert.equal(run('scene'),'victory');
 run('startGame(); player.x=key.x; player.z=key.z; player.y=-5;');
 ctx.keyboard={};run('update()');
