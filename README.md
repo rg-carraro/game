@@ -13,10 +13,12 @@ As plataformas são desenhadas como blocos em perspectiva, com topo mais claro e
 
 O pulo foi ajustado para uma força moderada (0.55). Nas travessias mais longas, avance um pouco em direção à próxima plataforma antes de pular. Solte W/↑ quando estiver sobre a plataforma para cair nela. O personagem também começa na altura correta do chão, permitindo pular imediatamente.
 
-Esta cópia foi feita a partir do código fornecido na conversa. Não foi sincronizada com o editor online. A colisão vertical e a altura exigida pelos objetivos ainda precisam de revisão.
+O mapa tem 12 plataformas numeradas, curvas, subidas graduais e um minimapa da rota. O pouso verifica a passagem pelo topo na descida; chave e saída respeitam a altura do jogador. A colisão lateral dos blocos ainda não é implementada.
+
+Esta cópia não foi sincronizada com o editor online.
 
 ## Verificação local
-O jogo abre no menu: espaço inicia uma introdução de 9 segundos (espaço novamente pula a cena). O Seek aparece perseguindo o jogador e depois bate na porta antes da partida começar.
+O jogo abre no menu: espaço entra no lobby, uma área segura para andar e treinar saltos nos blocos dourados. C abre o som e M volta ao menu. Aproxime-se da porta vermelha e pressione E para iniciar a introdução de 9 segundos (espaço pula a cena). O Seek aparece perseguindo o jogador e depois bate na porta antes da partida começar.
 
 A perseguição acelera com passos e batimentos; as batidas ficam mais fortes, a porta racha e começa a abrir. O Seek tem olho único detalhado, reflexos, garras e membros animados, com o mesmo desenho na introdução, na partida e no jumpscare.
 
@@ -25,6 +27,8 @@ Pressione C no menu ou na tela de resultado para configurar o volume com ←/→
 Após uma derrota há um jumpscare e uma tela de reinício. R ou espaço reinicia diretamente a partida; M retorna ao menu. Essas opções também aparecem na vitória.
 
 Execute `node tests/game-flow.cjs` para verificar menu, áudio simulado, introdução, derrota e reinício.
+
+Execute `node tests/map.cjs` para simular o percurso inteiro, a vitória e os limites do lobby.
 
 Execute node tests/controls.cjs. O teste usa as APIs de teclado e desenho simuladas; o teste visual final é no microStudio.
 
